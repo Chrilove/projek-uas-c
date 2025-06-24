@@ -860,14 +860,14 @@ export default function AdminOrdersPage() {
                         {modalType === 'status' && newStatus === 'shipped' && (
                           <div className="alert alert-info">
                             <i className="fas fa-info-circle me-2"></i>
-                            <strong>Info:</strong> Mengubah status ke "Dikirim" akan otomatis membuat data pengiriman dengan nomor resi.
+                            <strong>Info:</strong> Mengubah status ke &quot;Dikirim&quot; akan otomatis membuat data pengiriman dengan nomor resi.
                           </div>
                         )}
                         
                         {modalType === 'payment' && newPaymentStatus === 'paid' && (
                           <div className="alert alert-success">
                             <i className="fas fa-check-circle me-2"></i>
-                            <strong>Info:</strong> Mengubah status pembayaran ke "Sudah Dibayar" akan otomatis mengubah status pesanan ke "Dikonfirmasi".
+                            <strong>Info:</strong> Mengubah status pembayaran ke &quot;Sudah Dibayar&quot; akan otomatis mengubah status pesanan ke &quot;Dikonfirmasi&quot;.
                           </div>
                         )}
                       </div>
