@@ -194,27 +194,27 @@ export default function ResellerOrdersPage() {
   const handleSubmitPayment = async (e) => {
     e.preventDefault()
     if (isSubmitting) return
-
+  
     const paymentMethod = e.target.paymentMethod.value
     
     if (!paymentMethod) {
       alert('Pilih metode pembayaran!')
       return
     }
-
+  
     setIsSubmitting(true)
-
+  
     try {
-      // Handle COD payment differently
+      // Handle COD payment
       if (paymentMethod === 'COD') {
-        // Update order to COD status
+        // Update order to COD status directly using updateDoc
         const orderRef = doc(db, 'orders', selectedOrder.id)
         await updateDoc(orderRef, {
           paymentMethod: 'COD',
           paymentStatus: 'cod',
           updatedAt: new Date()
         })
-
+  
         setShowPaymentModal(false)
         setSelectedOrder(null)
         alert('Pembayaran COD berhasil dipilih! Pesanan akan diproses.')
@@ -226,31 +226,57 @@ export default function ResellerOrdersPage() {
           alert('Upload bukti pembayaran!')
           return
         }
-
-        // Update payment proof in Firebase
-        const result = await updatePaymentProof(
-          selectedOrder.id,
-          paymentMethod,
-          paymentProof.name,
-          '' // paymentProofURL - you can implement file upload to Firebase Storage later
-        )
-
-        if (result.success) {
-          setShowPaymentModal(false)
-          setSelectedOrder(null)
-          alert('Bukti pembayaran berhasil dikirim! Admin akan memverifikasi pembayaran Anda dalam 1x24 jam.')
-        } else {
-          throw new Error(result.error)
+  
+        // Validate file size (max 5MB)
+        if (paymentProof.size > 5 * 1024 * 1024) {
+          alert('Ukuran file terlalu besar! Maksimal 5MB.')
+          return
         }
+  
+        // Validate file type
+        if (!paymentProof.type.startsWith('image/')) {
+          alert('File harus berupa gambar!')
+          return
+        }
+  
+        // Update order directly without file upload for now
+        // TODO: Implement Firebase Storage upload later
+        const orderRef = doc(db, 'orders', selectedOrder.id)
+        await updateDoc(orderRef, {
+          paymentMethod: paymentMethod,
+          paymentStatus: 'waiting_verification',
+          paymentProofName: paymentProof.name,
+          paymentProofSize: paymentProof.size,
+          paymentProofType: paymentProof.type,
+          paymentSubmittedAt: new Date(),
+          updatedAt: new Date()
+        })
+  
+        setShowPaymentModal(false)
+        setSelectedOrder(null)
+        alert('Bukti pembayaran berhasil dikirim! Admin akan memverifikasi pembayaran Anda dalam 1x24 jam.')
       }
     } catch (error) {
       console.error('Error updating payment:', error)
-      alert('Gagal memproses pembayaran. Silakan coba lagi.')
+      
+      // More detailed error handling
+      let errorMessage = 'Gagal memproses pembayaran. '
+      
+      if (error.code === 'permission-denied') {
+        errorMessage += 'Tidak memiliki izin untuk mengupdate data.'
+      } else if (error.code === 'not-found') {
+        errorMessage += 'Pesanan tidak ditemukan.'
+      } else if (error.code === 'unavailable') {
+        errorMessage += 'Layanan sedang tidak tersedia. Coba lagi nanti.'
+      } else {
+        errorMessage += 'Silakan coba lagi atau hubungi admin.'
+      }
+      
+      alert(errorMessage)
     } finally {
       setIsSubmitting(false)
     }
   }
-
   const unpaidOrders = orders.filter(o => o.paymentStatus === 'waiting_payment').length
   const waitingVerification = orders.filter(o => o.paymentStatus === 'waiting_verification').length
   const shippedOrders = orders.filter(o => o.status === 'shipped').length
