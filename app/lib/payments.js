@@ -1,4 +1,4 @@
-// app/lib/payments.js
+// app/lib/payments.js - IMPROVED VERSION
 import { 
     collection, 
     addDoc, 
@@ -23,54 +23,132 @@ import {
   // Create new payment transaction
   export const createPaymentTransaction = async (paymentData) => {
     try {
+      console.log('Creating payment transaction with data:', paymentData);
+      
+      // Validate required fields
+      const requiredFields = ['orderId', 'orderNumber', 'resellerId', 'amount', 'method'];
+      for (const field of requiredFields) {
+        if (!paymentData[field]) {
+          throw new Error(`Missing required field: ${field}`);
+        }
+      }
+      
       const transactionNumber = generateTransactionNumber();
       
       const payment = {
         transactionId: transactionNumber,
         orderId: paymentData.orderId,
         orderNumber: paymentData.orderNumber,
-        customer: paymentData.customer,
-        customerEmail: paymentData.customerEmail,
+        customer: paymentData.customer || '',
+        customerEmail: paymentData.customerEmail || '',
         resellerId: paymentData.resellerId,
         amount: paymentData.amount,
         method: paymentData.method,
-        reference: paymentData.reference,
-        status: paymentData.status || 'processing', // processing, success, failed
-        type: paymentData.type || 'payment', // payment, refund, commission
+        reference: paymentData.reference || '',
+        status: paymentData.status || 'processing',
+        type: paymentData.type || 'payment',
         description: paymentData.description || '',
         adminNotes: '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
   
+      console.log('Attempting to create payment document:', payment);
+      
       const docRef = await addDoc(collection(db, 'payments'), payment);
       console.log('Payment transaction created with ID:', docRef.id);
       return { success: true, paymentId: docRef.id, transactionNumber };
     } catch (error) {
       console.error('Error creating payment transaction:', error);
-      return { success: false, error: error.message };
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      return { success: false, error: error.message, code: error.code };
     }
   };
   
   // Update payment status
   export const updatePaymentStatus = async (paymentId, status, adminNotes = '') => {
     try {
+      console.log(`Updating payment ${paymentId} with status: ${status}`);
+      
+      if (!paymentId) {
+        throw new Error('Payment ID is required');
+      }
+      
+      if (!status) {
+        throw new Error('Payment status is required');
+      }
+      
       const paymentRef = doc(db, 'payments', paymentId);
-      await updateDoc(paymentRef, {
+      
+      // Check if payment exists first
+      const paymentSnap = await getDoc(paymentRef);
+      if (!paymentSnap.exists()) {
+        throw new Error('Payment not found');
+      }
+      
+      const updateData = {
         status,
-        adminNotes,
         updatedAt: serverTimestamp()
-      });
+      };
+      
+      if (adminNotes) {
+        updateData.adminNotes = adminNotes;
+      }
+      
+      console.log('Update data:', updateData);
+      
+      await updateDoc(paymentRef, updateData);
+      console.log('Payment status updated successfully');
       return { success: true };
     } catch (error) {
       console.error('Error updating payment status:', error);
-      return { success: false, error: error.message };
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      return { success: false, error: error.message, code: error.code };
+    }
+  };
+  
+  // Update payment with additional fields (for resellers)
+  export const updatePayment = async (paymentId, updateData) => {
+    try {
+      console.log(`Updating payment ${paymentId} with data:`, updateData);
+      
+      if (!paymentId) {
+        throw new Error('Payment ID is required');
+      }
+      
+      const paymentRef = doc(db, 'payments', paymentId);
+      
+      // Check if payment exists first
+      const paymentSnap = await getDoc(paymentRef);
+      if (!paymentSnap.exists()) {
+        throw new Error('Payment not found');
+      }
+      
+      const finalUpdateData = {
+        ...updateData,
+        updatedAt: serverTimestamp()
+      };
+      
+      console.log('Final update data:', finalUpdateData);
+      
+      await updateDoc(paymentRef, finalUpdateData);
+      console.log('Payment updated successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      return { success: false, error: error.message, code: error.code };
     }
   };
   
   // Get all payment transactions (for admin)
   export const getAllPayments = async (statusFilter = null) => {
     try {
+      console.log('Getting all payments with filter:', statusFilter);
+      
       const paymentsRef = collection(db, 'payments');
       let q;
       
@@ -97,16 +175,24 @@ import {
         });
       });
       
+      console.log(`Retrieved ${payments.length} payments`);
       return { success: true, payments };
     } catch (error) {
       console.error('Error getting all payments:', error);
-      return { success: false, error: error.message };
+      console.error('Error code:', error.code);
+      return { success: false, error: error.message, code: error.code };
     }
   };
   
   // Get payments by reseller ID
   export const getPaymentsByReseller = async (resellerId) => {
     try {
+      console.log('Getting payments for reseller:', resellerId);
+      
+      if (!resellerId) {
+        throw new Error('Reseller ID is required');
+      }
+      
       const paymentsRef = collection(db, 'payments');
       const q = query(
         paymentsRef, 
@@ -126,39 +212,50 @@ import {
         });
       });
       
+      console.log(`Retrieved ${payments.length} payments for reseller`);
       return { success: true, payments };
     } catch (error) {
       console.error('Error getting payments by reseller:', error);
-      return { success: false, error: error.message };
+      console.error('Error code:', error.code);
+      return { success: false, error: error.message, code: error.code };
     }
   };
   
   // Get payment by ID
   export const getPaymentById = async (paymentId) => {
     try {
+      console.log('Getting payment by ID:', paymentId);
+      
+      if (!paymentId) {
+        throw new Error('Payment ID is required');
+      }
+      
       const paymentRef = doc(db, 'payments', paymentId);
       const paymentSnap = await getDoc(paymentRef);
       
       if (paymentSnap.exists()) {
-        return { 
-          success: true, 
-          payment: { 
-            id: paymentSnap.id, 
-            ...paymentSnap.data() 
-          } 
+        const payment = { 
+          id: paymentSnap.id, 
+          ...paymentSnap.data() 
         };
+        console.log('Payment found:', payment);
+        return { success: true, payment };
       } else {
+        console.log('Payment not found');
         return { success: false, error: 'Payment not found' };
       }
     } catch (error) {
       console.error('Error getting payment:', error);
-      return { success: false, error: error.message };
+      console.error('Error code:', error.code);
+      return { success: false, error: error.message, code: error.code };
     }
   };
   
   // Get payment statistics (for admin dashboard)
   export const getPaymentStats = async () => {
     try {
+      console.log('Getting payment statistics');
+      
       const paymentsRef = collection(db, 'payments');
       const querySnapshot = await getDocs(paymentsRef);
       
@@ -186,37 +283,54 @@ import {
       const averageTransaction = totalTransactions > 0 ? totalRevenue / successfulTransactions : 0;
       const successRate = totalTransactions > 0 ? (successfulTransactions / totalTransactions) * 100 : 0;
       
-      return {
-        success: true,
-        stats: {
-          totalRevenue,
-          totalTransactions,
-          averageTransaction,
-          successRate: successRate.toFixed(1),
-          successfulTransactions,
-          failedTransactions,
-          processingTransactions
-        }
+      const stats = {
+        totalRevenue,
+        totalTransactions,
+        averageTransaction,
+        successRate: successRate.toFixed(1),
+        successfulTransactions,
+        failedTransactions,
+        processingTransactions
       };
+      
+      console.log('Payment statistics:', stats);
+      return { success: true, stats };
     } catch (error) {
       console.error('Error getting payment stats:', error);
-      return { success: false, error: error.message };
+      console.error('Error code:', error.code);
+      return { success: false, error: error.message, code: error.code };
     }
   };
   
   // Retry failed payment
   export const retryPayment = async (paymentId) => {
     try {
+      console.log('Retrying payment:', paymentId);
+      
+      if (!paymentId) {
+        throw new Error('Payment ID is required');
+      }
+      
       const paymentRef = doc(db, 'payments', paymentId);
+      
+      // Check if payment exists first
+      const paymentSnap = await getDoc(paymentRef);
+      if (!paymentSnap.exists()) {
+        throw new Error('Payment not found');
+      }
+      
       await updateDoc(paymentRef, {
         status: 'processing',
         adminNotes: 'Payment retry initiated',
         updatedAt: serverTimestamp()
       });
+      
+      console.log('Payment retry initiated successfully');
       return { success: true };
     } catch (error) {
       console.error('Error retrying payment:', error);
-      return { success: false, error: error.message };
+      console.error('Error code:', error.code);
+      return { success: false, error: error.message, code: error.code };
     }
   };
   
