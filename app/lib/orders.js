@@ -231,7 +231,6 @@ export const updatePaymentProof = async (orderId, paymentMethod, paymentProof, p
       paymentProof,
       paymentProofURL,
       paymentStatus: 'waiting_verification',
-      adminMessage: 'Bukti pembayaran telah dikirim. Menunggu verifikasi dari admin.',
       updatedAt: serverTimestamp()
     });
     
